@@ -45,8 +45,8 @@ func TestNextRepeatAllWraps(t *testing.T) {
 	q := New()
 	q.Add(tracks("a", "b")...)
 	q.SetRepeat(RepeatAll)
-	q.Next()                    // b
-	n, ok := q.Next()           // wrap to a
+	q.Next()          // b
+	n, ok := q.Next() // wrap to a
 	if !ok || n.ID != "a" {
 		t.Fatalf("wrap = %v,%v; want a,true", n.ID, ok)
 	}
@@ -106,5 +106,66 @@ func TestShufflePreservesSetAndCurrent(t *testing.T) {
 		if ids[i] != want[i] {
 			t.Fatalf("shuffle lost tracks: got %v", ids)
 		}
+	}
+}
+
+func TestCurrentIndex(t *testing.T) {
+	q := New()
+	if q.CurrentIndex() != -1 {
+		t.Fatalf("empty CurrentIndex = %d; want -1", q.CurrentIndex())
+	}
+	q.Add(tracks("a", "b", "c")...)
+	if q.CurrentIndex() != 0 {
+		t.Fatalf("after Add CurrentIndex = %d; want 0", q.CurrentIndex())
+	}
+	q.Next()
+	if q.CurrentIndex() != 1 {
+		t.Fatalf("after Next CurrentIndex = %d; want 1", q.CurrentIndex())
+	}
+	q.JumpTo(2)
+	if q.CurrentIndex() != 2 {
+		t.Fatalf("after JumpTo CurrentIndex = %d; want 2", q.CurrentIndex())
+	}
+}
+
+func TestPrevRepeatAllWraps(t *testing.T) {
+	q := New()
+	q.Add(tracks("a", "b")...)
+	q.SetRepeat(RepeatAll)
+	p, ok := q.Prev() // pos 0 (a) wraps back to b
+	if !ok || p.ID != "b" {
+		t.Fatalf("prev wrap = %v,%v; want b,true", p.ID, ok)
+	}
+}
+
+func TestPrevRepeatOneStays(t *testing.T) {
+	q := New()
+	q.Add(tracks("a", "b")...)
+	q.Next() // b
+	q.SetRepeat(RepeatOne)
+	p, ok := q.Prev()
+	if !ok || p.ID != "b" {
+		t.Fatalf("repeat-one prev = %v,%v; want b,true", p.ID, ok)
+	}
+}
+
+func TestUnshuffleRestoresOrder(t *testing.T) {
+	q := New()
+	q.Add(tracks("a", "b", "c", "d")...)
+	q.Next() // current = b
+	q.SetShuffle(true)
+	q.SetShuffle(false)
+	var ids []string
+	for _, tr := range q.Tracks() {
+		ids = append(ids, tr.ID)
+	}
+	want := []string{"a", "b", "c", "d"}
+	for i := range want {
+		if ids[i] != want[i] {
+			t.Fatalf("unshuffle order = %v; want %v", ids, want)
+		}
+	}
+	if cur, _ := q.Current(); cur.ID != "b" {
+		t.Fatalf("unshuffle current = %v; want b", cur.ID)
 	}
 }

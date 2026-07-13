@@ -129,6 +129,6 @@ func (q *Queue) SetShuffle(on bool) {
 	}
 }
 
-func (q *Queue) Shuffle() bool             { return q.shuffle }
-func (q *Queue) SetRepeat(m RepeatMode)    { q.repeat = m }
-func (q *Queue) Repeat() RepeatMode        { return q.repeat }
+func (q *Queue) Shuffle() bool          { return q.shuffle }
+func (q *Queue) SetRepeat(m RepeatMode) { q.repeat = m }
+func (q *Queue) Repeat() RepeatMode     { return q.repeat }
