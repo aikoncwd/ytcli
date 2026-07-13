@@ -32,12 +32,15 @@ func progressBar(pos, dur, width int) string {
 }
 
 func truncate(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
 	r := []rune(s)
 	if len(r) <= max {
 		return s
 	}
-	if max <= 1 {
-		return string(r[:max])
+	if max == 1 {
+		return "…"
 	}
 	return string(r[:max-1]) + "…"
 }

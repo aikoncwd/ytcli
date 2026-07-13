@@ -33,4 +33,13 @@ func TestTruncate(t *testing.T) {
 	if got := truncate("hello world", 5); got != "hell…" {
 		t.Fatalf("truncate long = %q; want hell…", got)
 	}
+	if got := truncate("hello", 1); got != "…" {
+		t.Fatalf("truncate max=1 = %q; want …", got)
+	}
+	if got := truncate("hello", 0); got != "" {
+		t.Fatalf("truncate max=0 = %q; want empty", got)
+	}
+	if got := truncate("hello", -3); got != "" {
+		t.Fatalf("truncate negative max = %q; want empty", got)
+	}
 }
