@@ -24,6 +24,13 @@ type State struct {
 	Title    string
 }
 
+// Player runs and controls a single mpv process over its JSON IPC pipe.
+//
+// Concurrency: State() and the internal readLoop are mutex-guarded and safe to
+// run concurrently. The setter methods (Load, Seek, SetVolume, SetPaused,
+// TogglePause) write to the IPC connection WITHOUT a write mutex, so they must
+// all be called from one goroutine — in ytcli that is the Bubbletea Update
+// loop. readLoop is the sole reader of the connection.
 type Player struct {
 	mpvPath  string
 	pipeName string
@@ -59,13 +66,15 @@ func (p *Player) Start() error {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if err != nil {
+		p.Close()
 		return fmt.Errorf("conectando al IPC de mpv: %w", err)
 	}
 	p.conn = conn
 
 	for i, name := range []string{"time-pos", "duration", "volume", "pause", "media-title"} {
 		if _, err := p.conn.Write(cmdObserve(i+1, name)); err != nil {
-			return err
+			p.Close()
+			return fmt.Errorf("observando propiedades de mpv: %w", err)
 		}
 	}
 	go p.readLoop()
