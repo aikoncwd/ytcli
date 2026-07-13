@@ -17,8 +17,14 @@ func TestBuildSearchArgs(t *testing.T) {
 
 func TestBuildResolveArgs(t *testing.T) {
 	got := buildResolveArgs("https://youtu.be/x")
-	if got[0] != "https://youtu.be/x" || got[1] != "-J" {
-		t.Fatalf("resolve args = %v", got)
+	want := []string{"https://youtu.be/x", "-J", "--flat-playlist", "--no-warnings"}
+	if len(got) != len(want) {
+		t.Fatalf("resolve args = %v; want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("resolve args[%d] = %q; want %q", i, got[i], want[i])
+		}
 	}
 }
 
@@ -57,5 +63,27 @@ func TestParseDumpPlaylistUsesUploaderAndBuildsURL(t *testing.T) {
 	}
 	if got[1].Duration != 10 {
 		t.Fatalf("entry1 duration = %d; want 10", got[1].Duration)
+	}
+}
+
+func TestParseDumpEmptyPlaylistReturnsNoTracks(t *testing.T) {
+	js := []byte(`{"_type":"playlist","id":"PL123","title":"Empty","entries":[]}`)
+	got, err := parseDump(js)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("empty playlist should yield 0 tracks, got %d: %+v", len(got), got)
+	}
+}
+
+func TestParseDumpURLFallbackToURLField(t *testing.T) {
+	js := []byte(`{"id":"z","title":"T","url":"https://example.com/z"}`)
+	got, err := parseDump(js)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].URL != "https://example.com/z" {
+		t.Fatalf("url fallback = %q; want the url field", got[0].URL)
 	}
 }

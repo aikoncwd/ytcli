@@ -35,7 +35,7 @@ type rawEntry struct {
 
 type rawDump struct {
 	rawEntry
-	Entries []rawEntry `json:"entries"`
+	Entries *[]rawEntry `json:"entries"`
 }
 
 func (e rawEntry) toTrack() track.Track {
@@ -64,9 +64,9 @@ func parseDump(b []byte) ([]track.Track, error) {
 	if err := json.Unmarshal(b, &d); err != nil {
 		return nil, err
 	}
-	if len(d.Entries) > 0 {
-		out := make([]track.Track, 0, len(d.Entries))
-		for _, e := range d.Entries {
+	if d.Entries != nil {
+		out := make([]track.Track, 0, len(*d.Entries))
+		for _, e := range *d.Entries {
 			out = append(out, e.toTrack())
 		}
 		return out, nil
