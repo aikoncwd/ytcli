@@ -79,8 +79,3 @@ type Model struct {
 func New(q *queue.Queue, p playerPort, yt searchPort, st storePort, vol int) Model {
 	return Model{q: q, player: p, yt: yt, store: st, vol: vol, prevVol: vol, width: 46}
 }
-
-// View is a minimal placeholder so Model satisfies tea.Model (Init/Update/View).
-// Full rendering (compact/expanded layouts using the Task 7 format helpers) is
-// implemented in a later task; Task 8 only wires up state transitions.
-func (m Model) View() string { return "" }
