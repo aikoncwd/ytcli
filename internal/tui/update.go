@@ -49,10 +49,15 @@ func nextRepeat(r queue.RepeatMode) queue.RepeatMode {
 
 // playCurrent loads the queue's current track and records it in history.
 func (m *Model) playCurrent() {
-	if t, ok := m.q.Current(); ok {
-		m.player.Load(t.URL)
-		m.store.AppendHistory(t)
+	t, ok := m.q.Current()
+	if !ok {
+		return
 	}
+	if err := m.player.Load(t.URL); err != nil {
+		m.status = "Error al reproducir: " + err.Error()
+		return
+	}
+	m.store.AppendHistory(t)
 }
 
 func (m Model) activeList() []track.Track {

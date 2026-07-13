@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,11 +18,12 @@ type fakePlayer struct {
 	volume   int
 	endCh    chan struct{}
 	curState player.State
+	loadErr  error
 }
 
 func newFakePlayer() *fakePlayer { return &fakePlayer{endCh: make(chan struct{}, 1)} }
 
-func (f *fakePlayer) Load(u string) error    { f.loaded = u; return nil }
+func (f *fakePlayer) Load(u string) error    { f.loaded = u; return f.loadErr }
 func (f *fakePlayer) TogglePause() error     { f.toggled++; return nil }
 func (f *fakePlayer) Seek(d int) error       { f.seeked += d; return nil }
 func (f *fakePlayer) SetVolume(v int) error  { f.volume = v; return nil }
@@ -119,5 +121,26 @@ func TestSlashEntersSearch(t *testing.T) {
 	mm := m2.(Model)
 	if !mm.searching || mm.tab != tabSearch {
 		t.Fatal("/ should enter search mode on the Search tab")
+	}
+}
+
+func TestSpaceRuneTogglesPause(t *testing.T) {
+	m, fp, _ := newTestModel()
+	m.Update(key(' '))
+	if fp.toggled == 0 {
+		t.Fatal("space rune should toggle pause")
+	}
+}
+
+func TestPlayLoadErrorSetsStatusAndSkipsHistory(t *testing.T) {
+	m, fp, fs := newTestModel()
+	fp.loadErr = errors.New("boom")
+	m2, _ := m.Update(key('n'))
+	mm := m2.(Model)
+	if mm.status == "" {
+		t.Fatal("load error should set status")
+	}
+	if fs.appended != 0 {
+		t.Fatal("history should not be appended when load fails")
 	}
 }

@@ -51,6 +51,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if len(msg.Runes) == 1 {
 		switch msg.Runes[0] {
+		case ' ':
+			m.player.TogglePause()
+			return m, nil
 		case 'q':
 			m.quit = true
 			return m, tea.Quit
