@@ -27,9 +27,12 @@ func extractMpvExe(archivePath, destExe string) error {
 			if err != nil {
 				return err
 			}
-			defer out.Close()
-			_, err = io.Copy(out, rc)
-			return err
+			if _, err := io.Copy(out, rc); err != nil {
+				out.Close()
+				os.Remove(destExe)
+				return err
+			}
+			return out.Close()
 		}
 	}
 	return errors.New("mpv.exe no está dentro del archivo .7z")

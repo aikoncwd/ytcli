@@ -2,6 +2,10 @@ package deps
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -58,5 +62,40 @@ func TestPickMpvAsset(t *testing.T) {
 	}
 	if got.URL != "good" {
 		t.Fatalf("picked %q; want the plain x86_64 build", got.URL)
+	}
+}
+
+func TestDownloadWritesFileAndNoPartLeft(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("hello-binary"))
+	}))
+	defer srv.Close()
+	dst := filepath.Join(t.TempDir(), "tool.exe")
+	if err := download(srv.URL, dst); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(dst)
+	if err != nil || string(b) != "hello-binary" {
+		t.Fatalf("downloaded content = %q, err %v", string(b), err)
+	}
+	if _, err := os.Stat(dst + ".part"); !os.IsNotExist(err) {
+		t.Fatal(".part temp file should not remain after success")
+	}
+}
+
+func TestDownloadHTTPErrorLeavesNoFile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "nope", http.StatusNotFound)
+	}))
+	defer srv.Close()
+	dst := filepath.Join(t.TempDir(), "tool.exe")
+	if err := download(srv.URL, dst); err == nil {
+		t.Fatal("expected error on HTTP 404")
+	}
+	if _, err := os.Stat(dst); !os.IsNotExist(err) {
+		t.Fatal("no file should be created on HTTP error")
+	}
+	if _, err := os.Stat(dst + ".part"); !os.IsNotExist(err) {
+		t.Fatal("no .part file should remain on HTTP error")
 	}
 }

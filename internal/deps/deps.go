@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"time"
 )
 
 type Paths struct {
@@ -23,6 +24,9 @@ const (
 	ytDlpURL   = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 	mpvRelease = "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
 )
+
+// httpClient bounds how long a stalled download can hang.
+var httpClient = &http.Client{Timeout: 10 * time.Minute}
 
 // BinDir returns %LOCALAPPDATA%\ytcli\bin.
 func BinDir() (string, error) {
@@ -85,7 +89,7 @@ func download(url, dst string) error {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return err
 	}
@@ -93,17 +97,28 @@ func download(url, dst string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("descarga %s: HTTP %d", url, resp.StatusCode)
 	}
-	f, err := os.Create(dst)
+	tmp := dst + ".part"
+	f, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	return err
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmp)
+		return err
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	return os.Rename(tmp, dst)
 }
 
 // Ensure returns paths to mpv and yt-dlp, downloading any that are missing.
 func Ensure(binDir string, progress func(string)) (Paths, error) {
+	if progress == nil {
+		progress = func(string) {}
+	}
 	var p Paths
 
 	if path, ok := resolveBinary("yt-dlp", binDir, exec.LookPath, fileExists); ok {
@@ -131,7 +146,7 @@ func Ensure(binDir string, progress func(string)) (Paths, error) {
 }
 
 func downloadMpv(binDir string, progress func(string)) (string, error) {
-	resp, err := http.Get(mpvRelease)
+	resp, err := httpClient.Get(mpvRelease)
 	if err != nil {
 		return "", err
 	}
