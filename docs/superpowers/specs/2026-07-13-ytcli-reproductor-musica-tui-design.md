@@ -80,6 +80,12 @@ Añade debajo del bloque compacto un panel con pestañas navegables:
 
 Selección con flechas, `Enter` para reproducir. `Tab` vuelve a colapsar a compacto.
 
+**Modo comando vs. modo texto:** los atajos de una letra (`n`, `p`, `s`, `f`, `m`...) actúan
+como comandos salvo cuando el campo de búsqueda tiene el foco (tras pulsar `/`): ahí las
+teclas escriben texto y solo `Enter` (buscar/confirmar) y `Esc` (cancelar) tienen efecto de
+control. `Space`, flechas de volumen y seek siguen controlando la reproducción en cualquier
+contexto que no sea el de escritura.
+
 ### Controles (teclado)
 
 | Tecla | Acción |
