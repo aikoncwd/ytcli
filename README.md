@@ -18,7 +18,9 @@ arranque en Windows.
 | Espacio | Play / Pausa |
 | ← / → | Seek ∓10s |
 | n / p | Siguiente / anterior |
-| ↑ / ↓ (o + / -) | Volumen |
+| + / - | Volumen |
+| ↑ / ↓ | Volumen (modo compacto) · mover selección (modo expandido) |
+| 1 / 2 / 3 / 4 | Ir a pestaña Cola / Buscar / Historial / Favoritos |
 | m | Mute |
 | s | Shuffle |
 | r | Repeat (off/all/one) |

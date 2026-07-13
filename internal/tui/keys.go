@@ -80,16 +80,21 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.q.SetRepeat(nextRepeat(m.q.Repeat()))
 			return m, nil
 		case 'f':
-			if t, ok := m.q.Current(); ok {
-				m.store.ToggleFavorite(t)
-			}
-			return m, nil
+			return m.toggleFavorite()
 		case '/':
 			m.mode = modeExpanded
 			m.tab = tabSearch
 			m.searching = true
 			m.query = ""
 			return m, nil
+		case '1':
+			return m.selectTab(tabQueue)
+		case '2':
+			return m.selectTab(tabSearch)
+		case '3':
+			return m.selectTab(tabHistory)
+		case '4':
+			return m.selectTab(tabFavorites)
 		}
 	}
 	return m, nil
@@ -140,6 +145,9 @@ func (m Model) playSelection() (tea.Model, tea.Cmd) {
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
+	case tea.KeyCtrlC:
+		m.quit = true
+		return m, tea.Quit
 	case tea.KeyEnter:
 		m.searching = false
 		return m, m.searchCmd(m.query)

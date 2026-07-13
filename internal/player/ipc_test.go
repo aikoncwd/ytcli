@@ -45,8 +45,12 @@ func TestApplyLineProperties(t *testing.T) {
 
 func TestApplyLineReturnsEvent(t *testing.T) {
 	var st State
-	ev, err := applyLine([]byte(`{"event":"end-file"}`), &st)
-	if err != nil || ev != "end-file" {
-		t.Fatalf("ev = %q, err = %v; want end-file,nil", ev, err)
+	ev, reason, err := applyLine([]byte(`{"event":"end-file","reason":"eof"}`), &st)
+	if err != nil || ev != "end-file" || reason != "eof" {
+		t.Fatalf("got ev=%q reason=%q err=%v; want end-file,eof,nil", ev, reason, err)
+	}
+	ev, reason, _ = applyLine([]byte(`{"event":"end-file","reason":"stop"}`), &st)
+	if ev != "end-file" || reason != "stop" {
+		t.Fatalf("stop event: got ev=%q reason=%q; want end-file,stop", ev, reason)
 	}
 }

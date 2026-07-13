@@ -39,10 +39,11 @@ type Player struct {
 	mu       sync.Mutex
 	state    State
 	endCh    chan struct{}
+	lostCh   chan struct{}
 }
 
 func New(mpvPath string) *Player {
-	return &Player{mpvPath: mpvPath, pipeName: PipeName, endCh: make(chan struct{}, 1)}
+	return &Player{mpvPath: mpvPath, pipeName: PipeName, endCh: make(chan struct{}, 1), lostCh: make(chan struct{}, 1)}
 }
 
 func (p *Player) Start() error {
@@ -87,14 +88,18 @@ func (p *Player) readLoop() {
 	for sc.Scan() {
 		line := sc.Bytes()
 		p.mu.Lock()
-		ev, _ := applyLine(line, &p.state)
+		ev, reason, _ := applyLine(line, &p.state)
 		p.mu.Unlock()
-		if ev == "end-file" {
+		if ev == "end-file" && reason == "eof" {
 			select {
 			case p.endCh <- struct{}{}:
 			default:
 			}
 		}
+	}
+	select {
+	case p.lostCh <- struct{}{}:
+	default:
 	}
 }
 
@@ -125,6 +130,9 @@ func (p *Player) State() State {
 }
 
 func (p *Player) EndCh() <-chan struct{} { return p.endCh }
+
+// LostCh signals once when the IPC read loop ends (mpv/pipe gone).
+func (p *Player) LostCh() <-chan struct{} { return p.lostCh }
 
 func (p *Player) Close() error {
 	if p.conn != nil {

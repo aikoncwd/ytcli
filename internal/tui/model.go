@@ -14,6 +14,7 @@ type playerPort interface {
 	SetVolume(v int) error
 	State() player.State
 	EndCh() <-chan struct{}
+	LostCh() <-chan struct{}
 }
 
 type searchPort interface {

@@ -17,30 +17,37 @@ type fakePlayer struct {
 	seeked   int
 	volume   int
 	endCh    chan struct{}
+	lostCh   chan struct{}
 	curState player.State
 	loadErr  error
 }
 
-func newFakePlayer() *fakePlayer { return &fakePlayer{endCh: make(chan struct{}, 1)} }
+func newFakePlayer() *fakePlayer {
+	return &fakePlayer{endCh: make(chan struct{}, 1), lostCh: make(chan struct{}, 1)}
+}
 
-func (f *fakePlayer) Load(u string) error    { f.loaded = u; return f.loadErr }
-func (f *fakePlayer) TogglePause() error     { f.toggled++; return nil }
-func (f *fakePlayer) Seek(d int) error       { f.seeked += d; return nil }
-func (f *fakePlayer) SetVolume(v int) error  { f.volume = v; return nil }
-func (f *fakePlayer) State() player.State    { return f.curState }
-func (f *fakePlayer) EndCh() <-chan struct{} { return f.endCh }
+func (f *fakePlayer) Load(u string) error     { f.loaded = u; return f.loadErr }
+func (f *fakePlayer) TogglePause() error      { f.toggled++; return nil }
+func (f *fakePlayer) Seek(d int) error        { f.seeked += d; return nil }
+func (f *fakePlayer) SetVolume(v int) error   { f.volume = v; return nil }
+func (f *fakePlayer) State() player.State     { return f.curState }
+func (f *fakePlayer) EndCh() <-chan struct{}  { return f.endCh }
+func (f *fakePlayer) LostCh() <-chan struct{} { return f.lostCh }
 
 type fakeSearch struct{ result []track.Track }
 
 func (f *fakeSearch) Search(string, int) ([]track.Track, error) { return f.result, nil }
 func (f *fakeSearch) Resolve(string) ([]track.Track, error)     { return f.result, nil }
 
-type fakeStore struct{ appended, favToggled int }
+type fakeStore struct {
+	appended, favToggled int
+	hist, favs           []track.Track
+}
 
 func (f *fakeStore) AppendHistory(track.Track) error          { f.appended++; return nil }
 func (f *fakeStore) ToggleFavorite(track.Track) (bool, error) { f.favToggled++; return true, nil }
-func (f *fakeStore) LoadHistory() ([]track.Track, error)      { return nil, nil }
-func (f *fakeStore) LoadFavorites() ([]track.Track, error)    { return nil, nil }
+func (f *fakeStore) LoadHistory() ([]track.Track, error)      { return f.hist, nil }
+func (f *fakeStore) LoadFavorites() ([]track.Track, error)    { return f.favs, nil }
 
 func newTestModel() (Model, *fakePlayer, *fakeStore) {
 	q := queue.New()
@@ -142,5 +149,36 @@ func TestPlayLoadErrorSetsStatusAndSkipsHistory(t *testing.T) {
 	}
 	if fs.appended != 0 {
 		t.Fatal("history should not be appended when load fails")
+	}
+}
+
+func TestNumberKeyOpensAndLoadsHistoryTab(t *testing.T) {
+	m, _, fs := newTestModel()
+	fs.hist = []track.Track{{ID: "h1", Title: "Hist"}}
+	m2, _ := m.Update(key('3'))
+	mm := m2.(Model)
+	if mm.mode != modeExpanded || mm.tab != tabHistory {
+		t.Fatalf("'3' should open expanded Historial tab; mode=%v tab=%v", mm.mode, mm.tab)
+	}
+	if len(mm.history) != 1 || mm.history[0].ID != "h1" {
+		t.Fatalf("history not loaded from store: %+v", mm.history)
+	}
+}
+
+func TestNumberKeyOpensFavoritesTab(t *testing.T) {
+	m, _, fs := newTestModel()
+	fs.favs = []track.Track{{ID: "f1"}}
+	m2, _ := m.Update(key('4'))
+	mm := m2.(Model)
+	if mm.tab != tabFavorites || len(mm.favorites) != 1 {
+		t.Fatalf("'4' should open Favoritos and load favs; tab=%v favs=%+v", mm.tab, mm.favorites)
+	}
+}
+
+func TestPlayerLostSetsStatus(t *testing.T) {
+	m, _, _ := newTestModel()
+	m2, _ := m.Update(playerLostMsg{})
+	if m2.(Model).status == "" {
+		t.Fatal("playerLostMsg should set a status message")
 	}
 }

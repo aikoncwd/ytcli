@@ -74,7 +74,7 @@ func (m Model) compactView() string {
 }
 
 func (m Model) expandedView() string {
-	labels := []string{"Cola", "Buscar", "Historial", "Favoritos"}
+	labels := []string{"1 Cola", "2 Buscar", "3 Historial", "4 Favoritos"}
 	var tabs []string
 	for i, l := range labels {
 		if tab(i) == m.tab {

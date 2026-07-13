@@ -11,6 +11,7 @@ import (
 
 type tickMsg time.Time
 type endFileMsg struct{}
+type playerLostMsg struct{}
 type searchResultMsg struct {
 	tracks []track.Track
 	err    error
@@ -24,6 +25,10 @@ func listenEnd(ch <-chan struct{}) tea.Cmd {
 	return func() tea.Msg { <-ch; return endFileMsg{} }
 }
 
+func listenLost(ch <-chan struct{}) tea.Cmd {
+	return func() tea.Msg { <-ch; return playerLostMsg{} }
+}
+
 func (m Model) searchCmd(query string) tea.Cmd {
 	yt := m.yt
 	return func() tea.Msg {
@@ -33,7 +38,7 @@ func (m Model) searchCmd(query string) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), listenEnd(m.player.EndCh()))
+	return tea.Batch(tickCmd(), listenEnd(m.player.EndCh()), listenLost(m.player.LostCh()))
 }
 
 func nextRepeat(r queue.RepeatMode) queue.RepeatMode {
@@ -73,6 +78,50 @@ func (m Model) activeList() []track.Track {
 	}
 }
 
+// selectTab switches to tab t in expanded mode, loading store-backed lists.
+func (m Model) selectTab(t tab) (tea.Model, tea.Cmd) {
+	m.mode = modeExpanded
+	m.tab = t
+	m.cursor = 0
+	switch t {
+	case tabHistory:
+		m.history, _ = m.store.LoadHistory()
+	case tabFavorites:
+		m.favorites, _ = m.store.LoadFavorites()
+	}
+	return m, nil
+}
+
+// toggleFavorite favorites the selected list item (expanded, non-queue tab) or
+// else the current track, and refreshes the favorites list if it's showing.
+func (m Model) toggleFavorite() (tea.Model, tea.Cmd) {
+	var t track.Track
+	var ok bool
+	list := m.activeList()
+	if m.mode == modeExpanded && m.tab != tabQueue && m.cursor >= 0 && m.cursor < len(list) {
+		t, ok = list[m.cursor], true
+	} else {
+		t, ok = m.q.Current()
+	}
+	if !ok {
+		return m, nil
+	}
+	if _, err := m.store.ToggleFavorite(t); err != nil {
+		m.status = "Error al marcar favorito: " + err.Error()
+		return m, nil
+	}
+	if m.tab == tabFavorites {
+		m.favorites, _ = m.store.LoadFavorites()
+		if m.cursor >= len(m.favorites) {
+			m.cursor = len(m.favorites) - 1
+		}
+		if m.cursor < 0 {
+			m.cursor = 0
+		}
+	}
+	return m, nil
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -88,6 +137,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.playCurrent()
 		}
 		return m, listenEnd(m.player.EndCh())
+
+	case playerLostMsg:
+		m.status = "Conexión con mpv perdida"
+		return m, nil
 
 	case searchResultMsg:
 		if msg.err != nil {

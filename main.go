@@ -56,8 +56,11 @@ func run(urls []string) error {
 		q.Add(tracks...)
 	}
 	if t, ok := q.Current(); ok {
-		p.Load(t.URL)
-		st.AppendHistory(t)
+		if err := p.Load(t.URL); err != nil {
+			fmt.Fprintln(os.Stderr, "  aviso: no se pudo iniciar la reproducción:", err)
+		} else {
+			st.AppendHistory(t)
+		}
 	}
 
 	m := tui.New(q, p, yt, st, 80)

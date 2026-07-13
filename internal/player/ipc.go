@@ -16,16 +16,17 @@ func cmdObserve(id int, name string) []byte {
 }
 
 type eventMsg struct {
-	Event string          `json:"event"`
-	Name  string          `json:"name"`
-	Data  json.RawMessage `json:"data"`
+	Event  string          `json:"event"`
+	Name   string          `json:"name"`
+	Data   json.RawMessage `json:"data"`
+	Reason string          `json:"reason"`
 }
 
-// applyLine updates st from an mpv property-change line and returns the event name.
-func applyLine(line []byte, st *State) (string, error) {
+// applyLine updates st from an mpv property-change line and returns the event name and reason.
+func applyLine(line []byte, st *State) (event, reason string, err error) {
 	var m eventMsg
 	if err := json.Unmarshal(line, &m); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if m.Event == "property-change" {
 		switch m.Name {
@@ -56,5 +57,5 @@ func applyLine(line []byte, st *State) (string, error) {
 			}
 		}
 	}
-	return m.Event, nil
+	return m.Event, m.Reason, nil
 }
