@@ -9,6 +9,7 @@ import (
 // Ports keep the model testable with fakes and decouple it from concrete deps.
 type playerPort interface {
 	Load(url string) error
+	Stop() error
 	TogglePause() error
 	Seek(delta int) error
 	SetVolume(v int) error
@@ -27,6 +28,7 @@ type storePort interface {
 	ToggleFavorite(t track.Track) (bool, error)
 	LoadHistory() ([]track.Track, error)
 	LoadFavorites() ([]track.Track, error)
+	SavePlaylist(ts []track.Track) error
 }
 
 type mode int
@@ -67,6 +69,11 @@ type Model struct {
 	query     string
 	cursor    int
 
+	showHelp bool // modal help panel (alt screen)
+	helpFrom mode // mode to restore when the help closes
+
+	favIDs map[string]bool // favorite IDs, for the ⭐ marker in lists
+
 	results   []track.Track
 	history   []track.Track
 	favorites []track.Track
@@ -75,8 +82,18 @@ type Model struct {
 	width  int
 	height int
 	quit   bool
+
+	sizeKnown    bool // first WindowSizeMsg received
+	pendingClear bool // main screen rewrapped while in the alt screen
 }
 
 func New(q *queue.Queue, p playerPort, yt searchPort, st storePort, vol int) Model {
-	return Model{q: q, player: p, yt: yt, store: st, vol: vol, prevVol: vol, width: 46}
+	favIDs := make(map[string]bool)
+	if favs, err := st.LoadFavorites(); err == nil {
+		for _, t := range favs {
+			favIDs[t.ID] = true
+		}
+	}
+	return Model{q: q, player: p, yt: yt, store: st, vol: vol, prevVol: vol,
+		width: 46, favIDs: favIDs}
 }

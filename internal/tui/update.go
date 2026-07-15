@@ -38,7 +38,10 @@ func (m Model) searchCmd(query string) tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), listenEnd(m.player.EndCh()), listenLost(m.player.LostCh()))
+	// ClearScreen anchors the player at the terminal's first row instead of
+	// leaving it below the shell prompt and previous output.
+	return tea.Batch(tea.ClearScreen, tickCmd(),
+		listenEnd(m.player.EndCh()), listenLost(m.player.LostCh()))
 }
 
 func nextRepeat(r queue.RepeatMode) queue.RepeatMode {
@@ -62,7 +65,47 @@ func (m *Model) playCurrent() {
 		m.status = "Error al reproducir: " + err.Error()
 		return
 	}
+	m.status = ""
 	m.store.AppendHistory(t)
+}
+
+// savePlaylist persists the queue to playlist.txt next to the exe. It saves
+// the insertion order, not the playback order, so an active shuffle never
+// rewrites the user's curated file in scrambled order.
+func (m *Model) savePlaylist() {
+	if err := m.store.SavePlaylist(m.q.OriginalTracks()); err != nil {
+		m.status = "Error al guardar la playlist: " + err.Error()
+	}
+}
+
+// setMode switches compact/expanded and keeps the terminal screen in sync:
+// expanded mode lives in the alt screen because growing the inline view in
+// place is unreliable (ConPTY scroll desync eats the bottom border).
+func (m *Model) setMode(newMode mode) tea.Cmd {
+	if m.mode == newMode {
+		return nil
+	}
+	m.mode = newMode
+	if newMode == modeExpanded {
+		return tea.EnterAltScreen
+	}
+	if m.pendingClear {
+		// The terminal was resized while in the alt screen: the main buffer
+		// content rewrapped, so redraw it from scratch after switching back.
+		m.pendingClear = false
+		return tea.Sequence(tea.ExitAltScreen, tea.ClearScreen)
+	}
+	return tea.ExitAltScreen
+}
+
+// clampCursor keeps the cursor inside a list of length n.
+func (m *Model) clampCursor(n int) {
+	if m.cursor >= n {
+		m.cursor = n - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
 }
 
 func (m Model) activeList() []track.Track {
@@ -80,7 +123,7 @@ func (m Model) activeList() []track.Track {
 
 // selectTab switches to tab t in expanded mode, loading store-backed lists.
 func (m Model) selectTab(t tab) (tea.Model, tea.Cmd) {
-	m.mode = modeExpanded
+	cmd := m.setMode(modeExpanded)
 	m.tab = t
 	m.cursor = 0
 	switch t {
@@ -89,7 +132,7 @@ func (m Model) selectTab(t tab) (tea.Model, tea.Cmd) {
 	case tabFavorites:
 		m.favorites, _ = m.store.LoadFavorites()
 	}
-	return m, nil
+	return m, cmd
 }
 
 // toggleFavorite favorites the selected list item (expanded, non-queue tab) or
@@ -106,18 +149,19 @@ func (m Model) toggleFavorite() (tea.Model, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
-	if _, err := m.store.ToggleFavorite(t); err != nil {
+	added, err := m.store.ToggleFavorite(t)
+	if err != nil {
 		m.status = "Error al marcar favorito: " + err.Error()
 		return m, nil
 	}
+	if added {
+		m.favIDs[t.ID] = true
+	} else {
+		delete(m.favIDs, t.ID)
+	}
 	if m.tab == tabFavorites {
 		m.favorites, _ = m.store.LoadFavorites()
-		if m.cursor >= len(m.favorites) {
-			m.cursor = len(m.favorites) - 1
-		}
-		if m.cursor < 0 {
-			m.cursor = 0
-		}
+		m.clampCursor(len(m.favorites))
 	}
 	return m, nil
 }
@@ -125,7 +169,20 @@ func (m Model) toggleFavorite() (tea.Model, tea.Cmd) {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		// On a width change the terminal rewraps the lines already on screen,
+		// so the inline renderer's cursor anchor (counted in logical lines) no
+		// longer matches physical rows and a plain repaint lands askew. A full
+		// clear re-anchors it. Height-only changes don't rewrap: no clear.
+		widthChanged := m.sizeKnown && msg.Width != m.width
+		m.sizeKnown = true
 		m.width, m.height = msg.Width, msg.Height
+		if !widthChanged {
+			return m, nil
+		}
+		if m.mode == modeCompact {
+			return m, tea.ClearScreen
+		}
+		m.pendingClear = true // the main buffer rewrapped under the alt screen
 		return m, nil
 
 	case tickMsg:
@@ -135,6 +192,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case endFileMsg:
 		if _, ok := m.q.Next(); ok {
 			m.playCurrent()
+		} else {
+			m.status = "Fin de la cola"
 		}
 		return m, listenEnd(m.player.EndCh())
 
@@ -150,6 +209,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.results = msg.tracks
 		m.cursor = 0
 		m.status = ""
+		if len(msg.tracks) == 0 {
+			m.status = "Sin resultados"
+		}
 		return m, nil
 
 	case tea.KeyMsg:

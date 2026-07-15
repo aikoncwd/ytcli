@@ -112,6 +112,10 @@ func (p *Player) send(b []byte) error {
 }
 
 func (p *Player) Load(url string) error  { return p.send(cmdLoad(url)) }
+
+// Stop ends playback and returns mpv to idle; end-file fires with a non-eof
+// reason, so it does not trigger queue auto-advance.
+func (p *Player) Stop() error { return p.send(cmdStop()) }
 func (p *Player) SetPaused(v bool) error { return p.send(cmdSetPause(v)) }
 func (p *Player) Seek(d int) error       { return p.send(cmdSeek(d)) }
 func (p *Player) SetVolume(v int) error  { return p.send(cmdSetVolume(v)) }

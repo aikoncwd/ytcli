@@ -1,10 +1,15 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.showHelp {
+		return m.handleHelpKey(msg)
+	}
 	if m.searching {
 		return m.handleSearchKey(msg)
 	}
@@ -37,11 +42,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.changeVolume(-volumeStep)
 	case tea.KeyTab:
 		if m.mode == modeCompact {
-			m.mode = modeExpanded
-		} else {
-			m.mode = modeCompact
+			return m, m.setMode(modeExpanded)
 		}
-		return m, nil
+		return m, m.setMode(modeCompact)
+	case tea.KeyEsc:
+		return m, m.setMode(modeCompact)
+	case tea.KeyDelete:
+		return m.removeSelection()
 	case tea.KeyEnter:
 		return m.playSelection()
 	case tea.KeyCtrlC:
@@ -81,12 +88,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case 'f':
 			return m.toggleFavorite()
+		case 'd':
+			return m.removeSelection()
 		case '/':
-			m.mode = modeExpanded
+			cmd := m.setMode(modeExpanded)
 			m.tab = tabSearch
 			m.searching = true
 			m.query = ""
-			return m, nil
+			return m, cmd
+		case '?':
+			return m.openHelp()
 		case '1':
 			return m.selectTab(tabQueue)
 		case '2':
@@ -98,6 +109,25 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// openHelp shows the modal help panel; it lives in the alt screen, so the
+// previous mode is remembered and restored on close.
+func (m Model) openHelp() (tea.Model, tea.Cmd) {
+	m.helpFrom = m.mode
+	m.showHelp = true
+	return m, m.setMode(modeExpanded)
+}
+
+// handleHelpKey makes the help panel modal: q/ctrl+c still quit, any other
+// key closes it and restores the mode it was opened from.
+func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.Type == tea.KeyCtrlC || (len(msg.Runes) == 1 && msg.Runes[0] == 'q') {
+		m.quit = true
+		return m, tea.Quit
+	}
+	m.showHelp = false
+	return m, m.setMode(m.helpFrom)
 }
 
 func (m Model) changeVolume(delta int) (tea.Model, tea.Cmd) {
@@ -124,6 +154,8 @@ func (m Model) toggleMute() (tea.Model, tea.Cmd) {
 }
 
 // playSelection plays the highlighted item of the active list (expanded mode).
+// Items from search/history/favorites already in the queue are jumped to
+// instead of re-added, so playlist.txt never accumulates duplicates.
 func (m Model) playSelection() (tea.Model, tea.Cmd) {
 	if m.mode != modeExpanded {
 		return m, nil
@@ -137,9 +169,39 @@ func (m Model) playSelection() (tea.Model, tea.Cmd) {
 		m.playCurrent()
 		return m, nil
 	}
-	m.q.Add(list[m.cursor])
+	t := list[m.cursor]
+	if idx := m.q.IndexOfID(t.ID); idx >= 0 {
+		m.q.JumpTo(idx)
+		m.playCurrent()
+		return m, nil
+	}
+	m.q.Add(t)
 	m.q.JumpTo(m.q.Len() - 1)
 	m.playCurrent()
+	m.savePlaylist()
+	return m, nil
+}
+
+// removeSelection deletes the highlighted queue item (expanded Cola tab only).
+// Removing the playing track loads the next one (or stops mpv on an empty
+// queue) so the player never keeps playing a track the queue no longer has.
+func (m Model) removeSelection() (tea.Model, tea.Cmd) {
+	if m.mode != modeExpanded || m.tab != tabQueue {
+		return m, nil
+	}
+	wasCurrent := m.cursor == m.q.CurrentIndex()
+	if !m.q.RemoveAt(m.cursor) {
+		return m, nil
+	}
+	if wasCurrent {
+		if m.q.Len() > 0 {
+			m.playCurrent()
+		} else {
+			m.player.Stop()
+		}
+	}
+	m.clampCursor(m.q.Len())
+	m.savePlaylist()
 	return m, nil
 }
 
@@ -150,6 +212,10 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case tea.KeyEnter:
 		m.searching = false
+		if strings.TrimSpace(m.query) == "" {
+			return m, nil
+		}
+		m.status = "Buscando…"
 		return m, m.searchCmd(m.query)
 	case tea.KeyEsc:
 		m.searching = false

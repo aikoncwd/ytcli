@@ -57,6 +57,24 @@ func (q *Queue) Tracks() []track.Track {
 	return out
 }
 
+// OriginalTracks returns the tracks in insertion order, ignoring shuffle.
+// Persisting this keeps playlist.txt stable across shuffled sessions.
+func (q *Queue) OriginalTracks() []track.Track {
+	out := make([]track.Track, len(q.tracks))
+	copy(out, q.tracks)
+	return out
+}
+
+// IndexOfID returns the playback-order index of the track with id, or -1.
+func (q *Queue) IndexOfID(id string) int {
+	for i, ti := range q.order {
+		if q.tracks[ti].ID == id {
+			return i
+		}
+	}
+	return -1
+}
+
 func (q *Queue) Next() (track.Track, bool) {
 	if len(q.order) == 0 {
 		return track.Track{}, false
@@ -91,6 +109,32 @@ func (q *Queue) Prev() (track.Track, bool) {
 		q.pos--
 	}
 	return q.Current()
+}
+
+// RemoveAt deletes the track at playback-order index i. The current position
+// follows the same track when possible; removing the current track leaves the
+// position pointing at the next one.
+func (q *Queue) RemoveAt(i int) bool {
+	if i < 0 || i >= len(q.order) {
+		return false
+	}
+	ti := q.order[i]
+	q.tracks = append(q.tracks[:ti], q.tracks[ti+1:]...)
+	q.order = append(q.order[:i], q.order[i+1:]...)
+	for j, v := range q.order {
+		if v > ti {
+			q.order[j] = v - 1
+		}
+	}
+	switch {
+	case len(q.order) == 0:
+		q.pos = -1
+	case i < q.pos:
+		q.pos--
+	case q.pos >= len(q.order):
+		q.pos = len(q.order) - 1
+	}
+	return true
 }
 
 func (q *Queue) JumpTo(index int) (track.Track, bool) {

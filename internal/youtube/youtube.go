@@ -31,6 +31,8 @@ type rawEntry struct {
 	Duration   *float64 `json:"duration"`
 	WebpageURL string   `json:"webpage_url"`
 	URL        string   `json:"url"`
+	IsLive     *bool    `json:"is_live"`
+	LiveStatus string   `json:"live_status"`
 }
 
 type rawDump struct {
@@ -54,7 +56,8 @@ func (e rawEntry) toTrack() track.Track {
 	if e.Duration != nil {
 		d = int(*e.Duration)
 	}
-	return track.Track{ID: e.ID, URL: u, Title: e.Title, Channel: ch, Duration: d}
+	live := e.LiveStatus == "is_live" || (e.IsLive != nil && *e.IsLive)
+	return track.Track{ID: e.ID, URL: u, Title: e.Title, Channel: ch, Duration: d, Live: live}
 }
 
 // parseDump reads yt-dlp -J output: a single video object, or a playlist

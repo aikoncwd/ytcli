@@ -8,6 +8,7 @@ func cmdJSON(parts ...interface{}) []byte {
 }
 
 func cmdLoad(url string) []byte { return cmdJSON("loadfile", url, "replace") }
+func cmdStop() []byte           { return cmdJSON("stop") }
 func cmdSetPause(p bool) []byte { return cmdJSON("set_property", "pause", p) }
 func cmdSeek(delta int) []byte  { return cmdJSON("seek", delta, "relative") }
 func cmdSetVolume(v int) []byte { return cmdJSON("set_property", "volume", v) }

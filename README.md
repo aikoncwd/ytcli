@@ -6,10 +6,22 @@ arranque en Windows.
 
 ## Uso
 
-    ytcli                      # abre vacío; usa / para buscar
-    ytcli <url>                # reproduce un vídeo
+    ytcli                      # abre la playlist guardada; usa / para buscar
+    ytcli <url>                # reproduce un vídeo (o un directo)
     ytcli <url-playlist>       # encola y reproduce una playlist
     ytcli <url1> <url2> ...    # encola varias
+    ytcli lofi girl radio      # busca en YouTube y reproduce el primer resultado
+    ytcli --help               # ayuda completa: uso, atajos y ficheros
+    ytcli --version            # versión
+
+## Ficheros de datos
+
+Todo vive en ficheros de texto **junto al ejecutable**, editables a mano
+(una pista por línea, campos separados por tabulador; basta con pegar una URL):
+
+    playlist.txt     la cola de reproducción (se carga al arrancar)
+    history.txt      historial (máx. 200, más reciente primero)
+    favorites.txt    favoritos
 
 ## Controles
 
@@ -26,9 +38,16 @@ arranque en Windows.
 | r | Repeat (off/all/one) |
 | / | Buscar |
 | Enter | Reproducir selección |
-| f | Favorito |
-| Tab | Compacto / expandido |
+| f | Favorito (marcado con ⭐ en las listas) |
+| ? | Ayuda (atajos) dentro de la TUI |
+| d / Supr | Quitar de la cola (pestaña Cola) |
+| Tab | Compacto / expandido (pantalla completa) |
+| Esc | Volver al modo compacto |
 | q | Salir |
+
+En el modo expandido cada pestaña tiene su color (Cola roja, Buscar azul,
+Historial ámbar, Favoritos rosa): el borde del panel cambia con la pestaña
+activa.
 
 ## Construir
 

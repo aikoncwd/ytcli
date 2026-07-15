@@ -7,5 +7,6 @@ type Track struct {
 	URL      string // watch URL handed to mpv
 	Title    string
 	Channel  string
-	Duration int // seconds; 0 if unknown
+	Duration int  // seconds; 0 if unknown
+	Live     bool // ongoing live stream (no fixed duration)
 }

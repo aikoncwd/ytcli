@@ -77,6 +77,33 @@ func TestParseDumpEmptyPlaylistReturnsNoTracks(t *testing.T) {
 	}
 }
 
+func TestParseDumpDetectsLiveStreams(t *testing.T) {
+	// Single video resolve exposes is_live; flat-playlist search only live_status.
+	js := []byte(`{"id":"live1","title":"Radio","is_live":true,"live_status":"is_live","duration":null,"webpage_url":"https://youtu.be/live1"}`)
+	got, err := parseDump(js)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got[0].Live || got[0].Duration != 0 {
+		t.Fatalf("track = %+v; want Live=true Duration=0", got[0])
+	}
+
+	js = []byte(`{"_type":"playlist","entries":[
+		{"id":"a","title":"VOD","live_status":"was_live","duration":100.0},
+		{"id":"b","title":"Radio","live_status":"is_live"}
+	]}`)
+	got, err = parseDump(js)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Live {
+		t.Fatalf("was_live must not be Live: %+v", got[0])
+	}
+	if !got[1].Live {
+		t.Fatalf("is_live entry should be Live: %+v", got[1])
+	}
+}
+
 func TestParseDumpURLFallbackToURLField(t *testing.T) {
 	js := []byte(`{"id":"z","title":"T","url":"https://example.com/z"}`)
 	got, err := parseDump(js)

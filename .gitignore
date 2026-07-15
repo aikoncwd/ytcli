@@ -1,3 +1,8 @@
 /ytcli.exe
 /ytcli
 /dist/
+
+# datos de runtime (la app los crea junto al exe)
+/playlist.txt
+/history.txt
+/favorites.txt
